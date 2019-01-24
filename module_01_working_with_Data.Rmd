@@ -1,0 +1,280 @@
+---
+title: "Working with Data - Cleaning, clustering,Summaey & Visulaization"
+author: "Ammar Mokhtar Gomaha Gaber"
+date: "19 January 2019"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+#Introduction
+Data is always contains missing values, outliers and repeated values. Before starting a serious analysis, data cleaning is curcial to commence using it.
+Missing value imputation is used to replace the missing values with average, mode or regressed values. Outliers's detecting methods are repeatedly used to improve data quality.
+
+# Clean your environment 
+rm()function is used to remove all the variables nad data from the previous sessions in order to have a fresh start.
+```{r}
+rm(list=ls(all=TRUE))
+```
+# Change the Current directory, if it is not the desired one
+By default RStudio opens in MY Dcuments. So, you need to change it to the directory where you plan to work in. This is called the curren working directory, it contains all the data and the outputs will be stored in it.
+```{r}
+getwd()
+```
+# Import the data to begin the cleaning
+Importing data from the workingin directory into RStudio session can be accomplished using various functions according to the data format.
+In this session we will use read.csv() function to read data in .csv format.
+```{r}
+cm <- read.csv("data/cm_2003-2015.csv", header = TRUE)
+```
+# Summary of the data variables and column hear checking
+We can obtain a full summary report of our data using summary() function. For specific perpouses, we can use colnames(), head(), tail(), or others.
+```{r}
+summary(cm)
+```
+```{r}
+colnames(cm)
+```
+
+# Check the structure of the data frame
+This will display the format of each variable in the data frame
+```{r}
+str(cm)
+```
+# Check if the data is data.frame or not
+```{r}
+class(cm)
+```
+
+# Detection and localization of errors
+1. Missing values (NA): R codes the missing values "NA". If the data is left balnk in the original dataset, R will replace the blank with "NA", which means Not Available. is.na()function is used to detect the number of missing values in dataset.It returns a logical answer; TRUE or False.
+```{r}
+table(is.na(cm$nox))
+#dim(cm$tmax)
+```
+# It is possible to plot scatter plot to see the data distribution
+```{r}
+require(ggplot2)
+#install.packages("ggplot2")
+#library(ggplot2)
+ggplot(cm, aes(pm10,tavg))+ geom_point()
+```
+
+ The NA can be omitted from the data set
+```{r}
+cm_cln <- na.omit(cm)
+ggplot(cm_cln, aes(pm10,tavg))+ geom_point()
+```
+
+# Boxpot will work good with clean data with no NA
+```{r}
+boxplot(cm_cln[,c(15,16,17)])
+```
+
+# Detection and localization of errors
+2. Outliers:
+
+
+Now let's detect the outliers ussing the boxplot(). Outliers do not equal errors. They should be detected, but not necessarily removed. Thier inclusion in the analysis is a statistical decision. coefficent 1.5 is the default.
+```{r}
+boxplot.stats(cm_cln$tmax, coef = 2)$out
+```
+Example is the method of Hiridoglou and Berthelot: $h(x)= max(x/x, x/x)>= r$,  and  $'x' > 0$.
+
+We can write this function as follows:
+```{r}
+hboutlier <- function(x,r){
+  x <- x[is.finite(x)]
+  stopifnot(
+    length(x)> 0
+    , all(x>=0)
+  )
+  xref <- median(x)
+  if(xref <= sqrt(.Machine&double.eps))
+    warning("Reference value close to zero: results may be inaccurate ")
+}
+```
+We can call this functionsas follows:
+```{r}
+#hboutlier(cm_cln$tmax)
+```
+
+#Variables Transformation
+In practice, data cleaning procedures involve a lot of ad-hoc tranformation.
+Read marx.csv data to be tranfered.
+```{r}
+marx <- read.csv("data/marx.csv", header = TRUE, stringsAsFactors = FALSE)
+marx
+```
+The task here is to standardize the heightd and express all of them in meters.
+```{r}
+marx_m <- marx
+I <- marx$unit =="cm"
+marx_m[I, "height"]<- marx$height[I]/100   # 1 m = 100 cm
+I <- marx_m$unit == "inch"
+marx_m[I, "inch"] <- marx$height[I]/39.37  # 1m =39.37 inch
+I <- marx$unit == "ft"
+marx_m[I,"ft"] <- marx$height[I]/3.28      # 1 m = 3.28 ft
+marx_m$unit <- "m"
+marx_m <- marx_m[,-c(4,5)]
+marx_m
+```
+# Imputation Methods
+1. Mean and 2. Median:
+
+
+Imputation is the process of estimating or deriving values for fields where data is missing. The basic numeric impuation methos is the mean:
+$\hat{x_i}= \bar{x}$   ......... (1)
+
+where $\hat{x_i}$ is the imputation value and the mean is taken over the observed values.
+```{r}
+x <- 1:500              # create a vector
+x[2:40] <- NA            # with an empty value
+x
+
+require(Hmisc)
+x <- impute(x, mean)
+x
+is.imputed(x)
+```
+
+Examples
+```{r}
+y <- 20:100
+y[50:80] <- NA
+y
+y[is.na(y)] <- mean(y, na.rm = TRUE)
+y
+```
+
+For example, imputation of the mean or median can be done as follows:
+```{r}
+require(Hmisc)
+x.mean <- impute(x, fun=mean)       # mean imputation
+x.median <- impute(x, fun = median)  # median imputation
+x.mean
+x.median
+```
+Note that imputed values are printed with a post-fixed asterix.
+The second imputation model is ratio imputation. The imputation estimate $\hat{x_i}$ is given by:
+$\hat{x_i} = \hat{R}y_i$                                  .........(2)
+
+where $y_i$ is a covariate and $\hat{R}$ is an estimate of the average ratio between $x$ and $y$. This is will be given by the sum of observed $x$ values divided by sum of corresponding $y$ values.
+```{r}
+#I <- is.na(x)
+#R <- sum(x[!I])/ sum(y[!I])
+#R
+#x[I] <- R * y[I]
+#x
+```
+# Imputation Methods
+3. Generalized linear Regression Models:
+
+
+The third method is generalized linear regression models. In such models, missing values are imputed as follows:
+$\hat{x_i} = \hat\beta_0+ \hat\beta_1 y_{1,i} + ... + \hat\beta_k y_{k,i}$
+
+where the $\hat\beta_0,\hat\beta_1,...,\hat\beta_k$are estimated linear regression coefficients for each of the auxiliary variables $y_1,y_2,...,y_k$.
+Estimating linear models is easy enough using $lm()$ function and $predict()$ in standard R. Here, we use the built-in iris data set as an example.
+```{r}
+data("iris")
+iris
+iris$Sepal.Length[1:10] <- NA
+iris
+modelm <- lm(Sepal.Length ~ Sepal.Width + Petal.Width, data = iris)
+summary(modelm)
+I <- is.na(iris$Sepal.Length)
+I
+iris$Sepal.Length[I] <- predict(modelm, newdata= iris[I,])
+# Print the imputed Sepal>Length values
+iris$Sepal.Length
+```
+#Imputation Methods
+4.Hot deck inputation:
+
+
+In hot deck imputation, missing values are imputed by copying values from similar recods in the same dataset. Or, in anonation:
+$\hat{x_i} = x_j$ ................ (3)
+
+where $x_j$ is taken from the observed values. Hot-deck imputation can be applied to numerical as well as categorical data but is only viable when enough donor records are avaialble.
+In random hot-deck imputation, a value is chosen randomly, and uninformly from thae same data set. Random hot-deck on a single vector can be applied with the impute function of the Hmisc package.
+```{r}
+data(women)
+height <- women$height
+# this is the orignal data
+height
+height[c(6,9)] <- NA
+# the data after adding NA
+height
+# data after imputation randomly using impute function
+(height <- impute(height,"random"))
+
+
+```
+
+The outcome of this imputation is very likely to be differnet each time it is executed. If we want the rest, but repatable (e.g for testing purposes) we can use $set.seed(<a number>)$ prior to calling imputating.
+```{r}
+# x : vector to be imputed
+# last : value to use if last value of x is empty
+seqImpute <- function(x, last){
+  n <- length(x)
+  x <- c(x, last)
+  i <- is.na(x)
+  while(any(i)){
+    x[i] <- x[which(i)+1]
+    i <- is.na(x)
+  }
+  x[1:n]
+}
+```
+#Imputation Methods 
+5. kNN-imputation:
+
+
+In k Nearest Neighbor imputation, one defines a distance function $d(i,j)$ that computes measures of dissimilarty between records. A missing value is then imputed by defining first the $k$ records nearest to the record with one or more missing values. Next, a value is chosen from or computed out of the $k$ nearest neighbors. In the case where a value is picked from the $k$ nearest neighbors, kNN-imputation is a form of hot-deck imputation.
+
+The VIM package contains a function called kNN that uses Gower distance to determine the $k$ nearest neighbors. Gower's distance between two records labeled $i$ and $j$ is defined as:
+
+$d_g(i,j) \frac {\sum_i w_ijk d_k(i,j)}{\sum_k w_ijk}$ .................(4)
+
+where the sum runs over all variables in the recrd and $d_x(i,j)$ is the siatance between the value of varible $k$ in record $i$ and $j$. 
+For categorical variables, $d_k(i,j)= 0$ when the value for $k^'$ the variable is the same in record $i$ and $j$ and 1 otherwise. For numerical variables the distance is given by:
+$1 - (x_i - x_j)/(max(x)-min(x)$........................................(5)
+
+The weight $w_i_j_k =0$ when the $k^'th$ variable is missing in recordd $i$ or record $j$ and otherwise $1$.
+Here is an example of kNN:
+```{r}
+library(VIM)
+data(iris)
+n <- nrow(iris)
+# provide some empty values (10 in each column, randomly)
+for (i in 1:ncol(iris)) {
+iris[sample(1:n, 10, replace = FALSE), i] <- NA
+}
+iris2 <- kNN(iris)
+iris2
+```
+
+For numerical varibales the median of the $k$ nearest neighbors is used as imputation value, for categorical variables the category that most often occurs in the $k$ nearest neighbors is used. Both these functions may be replaced by the user.
+
+# Imputation Methods
+6.Minimal Value Adjustment:
+
+
+The rspa package is able to take a numerical record $x^0$ and replace it with $x_,}$ such that the weighted Euclidean distance:
+$\sum_i w_i (x_i - x_i^o)^2$     .......................................(6)
+
+is minimized and $x$ obeys a given set of (in)equality restrictions.
+$Ax \le b$
+As a practical example consider the following script:
+```{r}
+library(editrules)
+library(rspa)
+E <- editmatrix(expression(x +y==z, x>=0, y>=0))
+d <- data.frame(x=10,y=10,z=21)
+d1 <- adjustRecords(E,d)
+d1$adjusted
+```
+
+
+# End of Module 01

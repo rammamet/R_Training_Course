@@ -1,0 +1,216 @@
+---
+title: "Ensemble Learining"
+author: "Ammar Mokhtar Gomaha Gaber"
+date: "21 January 2019"
+output:
+  html_document:
+    df_print: paged
+---
+#1.What is ensembling?
+In general, ensembling is a technique of combining two or more algorithms of similar or dissimilar types called base learners. This is done to make a more robust system which incorporates the predictions from all the base learners. It can be understood as conference room meeting between multiple traders to make a decision on whether the price of a stock will go up or not.
+#2. Types of Ensembling:
+Averaging: It's defined as taking the average of predictions from models in case of regression problem or while predicting probabilities for the classification problem.
+
+Majority vote: It's defined as taking the prediction with maximum vote / recommendation from multiple models predictions while predicting the outcomes of a classification problem.
+
+Weighted average: In this, different weights are applied to predictions from multiple models then taking the average which means giving high or low importance to specific model output.
+#3. Ensembling Techniuqes:
+#3.1 Baging:
+#3.2 Boosting:
+#3.3 Stacking:
+
+# caret Package
+Caret (Classification and Regression Training)will be used to perfrom the esnembleing learning.
+caret packages contains tolls for:
+1. spliting dta
+2. pre-processing
+3. feature selection
+4. model tuning using resampling
+5. variable importance estimation
+5. in addition to other functions
+
+# Practice:
+Load required libraries into R Session:
+```{r}
+# Clear the environment
+rm(list=ls(all=TRUE))
+#install.packages("caret")
+library(caret)
+```
+
+Let's set some seeds
+```{r}
+set.seed(1)
+```
+
+Loading the hackathon dataset and see if the structure of dataset 
+
+```{r}
+#data1 <-read.csv(url('https://datahack-prod.s3.ap-south-1.amazonaws.com/train_file/train_u6lujuX_CVtuZ9i.csv'))
+
+ensdat <- read.csv("Data/train_u6lujuX_CVtuZ9i.csv")
+str(ensdat)
+summary(ensdat)
+```
+
+
+Does the data contain missing values?
+```{r}
+table(is.na(ensdat))
+#sum(is.na(ensdat))
+```
+
+Imputing missing values using median
+```{r}
+preProcValues <- preProcess(ensdat, method = c("medianImpute","center","scale"))
+# install.packages("RANN")
+library('RANN')
+ensdat.imp <- predict(preProcValues, ensdat)
+# check the missing values
+sum(is.na(ensdat.imp))
+```
+
+# Model construction steps
+1. Split the data into train and test (3:1), 75% trainSet and 25% testSet
+```{r}
+index <- createDataPartition(ensdat.imp$Loan_Status, p=0.75, list=FALSE)
+trainSet <- ensdat.imp[ index,]
+testSet <- ensdat.imp[-index,]
+```
+
+2. Defining the training controls for multiple models
+```{r}
+fitControl <- trainControl(
+  method = "cv",
+  number = 5,
+savePredictions = 'final',
+classProbs = T)
+```
+
+
+3. Defining the predictors and outcome
+```{r}
+predictors <- c("Credit_History", "LoanAmount", "Loan_Amount_Term", "ApplicantIncome",
+  "CoapplicantIncome")
+outcomeName <-'Loan_Status'
+```
+
+Now let's get started with training a random forest and test its accuracy on the test set that we have created:
+#Training the random forest model
+```{r}
+model_rf<-train(trainSet[,predictors],trainSet[,outcomeName],method='rf',trControl=fitControl,tuneLength=3)
+```
+
+#Predicting using random forest model
+```{r}
+testSet$pred_rf<-predict(object = model_rf,testSet[,predictors])
+```
+
+
+#Checking the accuracy of the random forest model
+```{r}
+confusionMatrix(testSet$Loan_Status,testSet$pred_rf)
+```
+
+Well, as you can see, we got 0.82 accuracy with the individual random forest model. Let's see the performance of KNN:
+
+#Training the knn model
+```{r}
+model_knn<-train(trainSet[,predictors],trainSet[,outcomeName],method='knn',trControl=fitControl,tuneLength=3)
+
+```
+
+#Predicting using knn model
+```{r}
+testSet$pred_knn<-predict(object = model_knn,testSet[,predictors])
+```
+
+
+#Checking the accuracy of the random forest model
+```{r}
+confusionMatrix(testSet$Loan_Status,testSet$pred_knn)
+```
+
+It's great since we are able to get 0.86 accuracy with the individual KNN model. Let's see the performance of Logistic regression as well before we go on to create ensemble of these three.
+#Training the Logistic regression model
+```{r}
+model_lr<-train(trainSet[,predictors],trainSet[,outcomeName],method='glm',trControl=fitControl,tuneLength=3)
+```
+
+
+#Predicting using knn model
+```{r}
+testSet$pred_lr<-predict(object = model_lr,testSet[,predictors])
+```
+
+
+#Checking the accuracy of the random forest model
+```{r}
+confusionMatrix(testSet$Loan_Status,testSet$pred_lr)
+```
+
+And the logistic regression also gives us the accuracy of 0.86.
+
+Now, let's try out different ways of forming an ensemble with these models as we have discussed:
+
+#Averaging:
+In this, we'll average the predictions from the three models. Since the predictions are either 'Y' or 'N', averaging doesn't make much sense for this binary classification. However, we can do averaging on the probabilities of observations to be in wither of these binary classes.
+
+#Predicting the probabilities
+```{r}
+testSet$pred_rf_prob <-predict(object = model_rf,testSet[,predictors],type='prob')
+testSet$pred_knn_prob <-predict(object = model_knn,testSet[,predictors],type='prob')
+testSet$pred_lr_prob <-predict(object = model_lr,testSet[,predictors],type='prob')
+
+```
+
+#Taking average of predictions
+```{r}
+testSet$pred_avg <-(testSet$pred_rf_prob$Y+testSet$pred_knn_prob$Y+testSet$pred_lr_prob$Y)/3
+```
+
+
+#Splitting into binary classes at 0.5
+```{r}
+testSet$pred_avg <-as.factor(ifelse(testSet$pred_avg>0.5,'Y','N'))
+```
+
+#Majority Voting:
+In majority voting, we'll assign the prediction for the observation as predicted by the majority of models. Since we have three models for a binary classification task, a tie is not possible.
+
+#The majority vote
+```{r}
+testSet$pred_majority <-as.factor(ifelse(testSet$pred_rf=='Y' & testSet$pred_knn=='Y','Y',ifelse(testSet$pred_rf=='Y' & testSet$pred_lr=='Y','Y',ifelse(testSet$pred_knn=='Y' & testSet$pred_lr=='Y','Y','N'))))
+summary(testSet$pred_majority)
+```
+
+#Weighted Average:
+Instead of taking simple average, we can take weighted average. Generally, the weights of predictions are high for more accurate models. Let's assign 0.5 to logistic regression and 0.25 to KNN and random forest each.
+
+#Taking weighted average of predictions
+```{r}
+testSet$pred_weighted_avg <- (testSet$pred_rf_prob$Y*0.25)+(testSet$pred_knn_prob$Y*0.25)+(testSet$pred_lr_prob$Y*0.5)
+```
+
+
+#Splitting into binary classes at 0.5
+```{r}
+testSet$pred_weighted_avg <-as.factor(ifelse(testSet$pred_weighted_avg>0.5,'Y','N'))
+summary(testSet$pred_weighted_avg)
+```
+
+
+```{r}
+#require(caTools)
+#set.seed(101) 
+#sample <- sample.split(data$anycolumn, SplitRatio = .75)
+#train <- subset(data, sample == TRUE)
+#test  <- subset(data, sample == FALSE)
+```
+
+# GitHub
+# Download data from internet
+# Linux vs Windows
+
+
+

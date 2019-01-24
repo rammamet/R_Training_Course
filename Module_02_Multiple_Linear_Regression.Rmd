@@ -1,0 +1,374 @@
+---
+title: "Multiple Linear Regression"
+author: Ammar Mokhtar Gomaha Gaber
+date: 20 January 2019
+output: html_notebook
+---
+
+# Introductoion
+
+# Setting the working directory
+getwd()
+# Read pollutants and meteorlogical data - daily (2003-2011)for model developing
+```{r}
+cm <- read.csv("Data/cm_2003-2015.csv", header=TRUE,sep=",")
+names(cm)
+```
+
+Data summary to explore the data variables
+
+```{r}
+head(cm,5)
+tail(cm,5)
+```
+# Convert wind speed unit by multiply by 0.277778
+  
+  
+```{r}
+cm$ws <- cm$WS*0.277778
+names(cm)
+```
+```{r}
+require(caTools)
+sample <- sample.int(cm,SplitRatio=0.75)
+train <- subset(cm, sample==TRUE)
+test <- subset(cm, sample==FALSE)
+```
+
+# Arrange the data for regression analysis                # remove un desired columns
+# Subset the3 data
+# subset 2003-2011- dailly data for model development
+
+```{r}
+require(caTools)
+sample <- sample.split(cm, SplitRatio=0.75)
+train <- subset(cm,sample==TRUE)
+test <- subset(cm, sample==FALSE)
+```
+
+Sampling
+```{r}
+samsize <- floor(0.75 *nrow(cm))
+train_1 <- sample(seq_len(nrow(cm)), size=samsize)
+train <- cm[train_1,]
+test <- cm[-train_1,]
+
+dim(train)
+dim(test)
+```
+
+```{r}
+# Impte the NA with mean for all variables
+require(Hmisc)
+train <- impute(train, fun=mean)
+test <- impute(test, fun=mean)
+
+train <- sapply(train, impute)
+test <- sapply(test, impute)
+
+# write the data to the current working directory
+write.csv(train,"cm_train.csv")
+write.csv(train,"cm_test.csv")
+```
+
+
+
+
+
+
+
+# Check the missing values
+
+```{r}
+table(is.na(cm))
+sum(is.na(cm))
+```
+
+# Data Expration with ggplot
+```{r}
+install.packages("ggplot2")
+  install.packages("grid")
+  install.packages("gridExtra")
+  
+  install.packages(c("ggplot2","grid","gridExtra"))
+  library(ggplot2)
+  library(grid)
+  library(gridExtra)
+```
+  
+
+# Data exploration with ggplot
+
+Plot Wind Speed in panel plot
+remove missing values with na.omit=T
+ 
+```{r}
+train <- na.omit(train)
+  par(mfrow=c(2,2))
+  p1 <- ggplot(train, aes(x=ws, y=pm10)) + geom_point(size=0.5, color="navy") + xlab("Wind Speed")+ ylab("PM10 Concentration")+
+    ggtitle("Wind Speed vs PM10 Concentrration")
+```
+ 
+ Plot Tmax
+  
+```{r}
+ p2 <- ggplot(train, aes(x=tmax, y=pm10)) + geom_point(size=0.5, color="navy") + xlab("Maximum Temperature")+ ylab("PM10 Concentration")+
+    ggtitle("Maximum Temperature vs PM10 Concentrration")
+```
+ 
+#Rainfall
+```{r}
+ p3 <- ggplot(train, aes(x=rain, y=pm10)) + geom_point(size=0.5, color="navy") + xlab("Rainfall")+ ylab("PM10 Concentration")+
+    ggtitle("Rainfall vs PM10 Concentrration")
+```
+ 
+# Relative Hummidity
+```{r}
+ p4 <- ggplot(train, aes(x=rh, y=pm10)) + geom_point(size=0.5, color="navy") + xlab("Relative Humidity")+ ylab("PM10 Concentration")+
+    ggtitle("Relative Humidity vs PM10 Concentrration")
+```
+ 
+  # Panel Plot
+```{r}
+par(mfrow=c(2,2))
+  p1;p2;p3;p4
+```
+  
+  
+  # Pressure
+  
+```{r}
+ ggplot(cm0311, aes(x=press, y=pm10)) + geom_point(size=0.5, color="navy") + xlab("Surface Pressure")+ ylab("PM10 Concentration")+
+    ggtitle("Surface Pressure vs PM10 Concentrration")
+```
+ 
+  # Ozone
+```{r}
+ ggplot(cm0311, aes(x=o3, y=pm10)) + geom_point(size=0.5, color="navy") + xlab("Tropspheric Ozone")+ ylab("PM10 Concentration")+
+    ggtitle("Troposheric Ozone vs PM10 Concentrration")
+```
+ 
+  #Carbon Monoxide
+```{r}
+ggplot(cm0311, aes(x=co, y=pm10)) + geom_point(size=0.5, color="navy") + xlab("Carbon Monoxide")+ ylab("PM10 Concentration")+
+    ggtitle("CArbon Monoxide vs PM10 Concentrration")
+```
+  
+  # Nox
+```{r}
+ggplot(cm0311, aes(x=nox, y=pm10)) + geom_point(size=0.5, color="navy") + xlab("Nox")+ ylab("PM10 Concentration")+
+    ggtitle("Nitrogen Oxides vs PM10 Concentrration")
+```
+  
+  # Sox
+```{r}
+ggplot(cm0311, aes(x=so2, y=pm10)) + geom_point(size=0.5, color="navy") + xlab("Sox")+ ylab("PM10 Concentration")+
+    ggtitle("Sulphere Oxides vs PM10 Concentrration")
+```
+  
+
+# Impute the missing values                                      
+
+```{r}
+table(is.na(cm$pm10)) 
+
+
+cm$pm10.mean <- ifelse(is.na(cm1$pm10), mean(cm$pm10, na.rm = TRUE), cm$pm10)
+
+
+table(is.na(cm$press)) 
+
+cm$press.mean <- ifelse(is.na(cm), mean(cm, na.rm = TRUE), cm$press)
+  
+```
+ 
+# check NA for all the data
+```{r}
+table(is.na(cm))
+  
+  cm$pm10.median <- ifelse(is.na(cm0311$pm10), median(cm0311$pm10, na.rm = TRUE), cm0311$pm10)
+```
+  
+ 
+  #         Statistical Analysis  
+  
+  # Function to create histogram overlaped by density plot:
+```{r}
+library(ggplot2)
+  
+  tr <- function(a){
+    ggplot(data = cm, aes(x=a,y=..density..))+ 
+      geom_histogram(fill="blue", color="red", alpha=0.5, bins=100)+ geom_density()
+    #ggplot(y)
+  }
+  tr(cm$tmax)
+  
+  cm$pm.trs <- (log(cm$pm10)+1)
+  cm$pm10.trns <- log(cm$pm10)
+  ggplot(cm, aes(x=pm10.trns,y=..density..))+ geom_histogram(fill="blue",color="black",alpha=0.5,bins=100)+geom_density()
+  
+  train <- cm0311
+  test <- cm[1084:1563,-c(1,2,5,6,9:11)]
+```
+  
+ 
+  #-----------------------------------------------------------------------------------------------------#
+  # Calculate missing values percentage per column:
+```{r}
+mvtr <- sapply(train, function(x){sum(is.na(x)/length(x))})*100 
+  mvts <- sapply(test, function(x){sum(is.na(x)/length(x))})*100  
+  
+  mvtr; mvts
+```
+  
+  
+  #----------------------------------------------------------------------------------------------------#
+  #                                   MLR Model Constuction                                            
+```{r}
+ cm <- na.omit(cm) # using CM data from 2003 to 2011 for model parameters' estimation
+```
+ 
+  # Fit MLR model and generate the summary
+  # correlation and plot of each explanatory variable with PM10
+```{r}
+ model.pm <-lm(pm10~ ., data = train[,-c(1,2)])
+  summary(model.pm)
+  
+  pm10model        <- summary(lm(pm10~tmax+rh+rain+ws+press+o3+co+nox+so2, data=train))
+  pmmodel.mean     <- summary(lm(pm10.mean~tmax+rh+rain+ws+press+o3+co+nox+so2, data=cm0311))
+  pmmodel.median   <- summary(lm(pm10.median~tmax+rh+rain+ws+press+o3+co+nox+so2, data=cm0311))
+  pm10model.trans  <- summary(lm(pm10.trns~tmax+rh+rain+ws+press+o3+co+nox+so2, data=train))
+```
+ 
+  # Multiple R-squared:  0.669,	Adjusted R-squared:  0.6659 
+```{r}
+ pm10model
+```
+  
+     # Multiple R-squared:  0.6615,	Adjusted R-squared:  0.6584 
+```{r}
+pmmodel.mean  
+```
+  
+  
+     # Multiple R-squared:  0.6631,	Adjusted R-squared:  0.66
+ 
+```{r}
+pmmodel.median
+```
+ 
+    # Multiple R-squared:  0.628,	Adjusted R-squared:  0.6245 
+```{r}
+pm10model.trans
+```
+  y = a + b1*xi + b2*xi + ... + bn*xn
+#-----------------------------------------#
+```{r}
+pm10 <- pm10model.trans$coefficients[1]+  pm10model.trans$coefficients[2] * tmax +  pm10model.trans$coefficients[3]*rh +
+    pm10model.trans$coefficients[4]*rain +  pm10model.trans$coefficients[5]*ws +  pm10model.trans$coefficients[6]*press +
+    pm10model.trans$coefficients[7]*o3 +  pm10model.trans$coefficients[8]*co+ pm10model.trans$coefficients[9]*so2
+```
+  
+  
+  # Model predoction
+  
+```{r}
+pred.pm <- model.pm$coefficients[1]
+  
+  pred.pm <- 368.30188 + 0.52717 * tmax -0.63554*rh + 0.02717 * rain -
+    0.69190 * ws + 0.68390 *o3 + 1.26036*nox + 41.22550 * com+
+    4.27249 * so2
+  
+  pred.1 <- vector("numeric", length = 20)
+  
+    for (i in 1:20) {
+      pred.1 [i]<- (368.30188 + 0.52717 *test$tmax[i] -0.63554*test$rh[i] + 0.02717 * test$rain[i] -
+        0.69190 * test$WS[i] -0.34111* test$press + 0.68390 *test$o3[i] + 1.26036*test$nox[i] + 41.22550 * cm0311$co[i]+
+        4.27249 * test$so2[i])
+    }
+```
+  
+ # Plot the model output
+```{r}
+plot(pred.1)
+  summary(pred.1)
+  str(pred.1)
+  length(pred.1)
+```
+ 
+  
+ 
+  #  Verification model results                                      
+  
+  #RMSE & MAE
+  #Read stations data
+  
+```{r}
+calb <- read.csv("F:/R_2018/An_Introduction_to_R_Course/data/Verification/Nan-2010.csv", header=T)
+  names(calb)
+  calb$WS <- calb$ws*0.277778
+  calb[is.na(calb)]<- 0
+  pmcal <- vector("numeric", 120)
+  for (i in 1:120){
+    pmcal[i] <- coef(pmmodel)[1,1]+coef(pmmodel)[2,1]*calb$tmax[i]+coef(pmmodel)[3,1]*calb$rh[i]+
+      coef(pmmodel)[4,1]*calb$rain[i]+coef(pmmodel)[5,1]*calb$ws[i]+coef(pmmodel)[6,1]*calb$press[i]+
+      coef(pmmodel)[7,1]*calb$o3[i]+coef(pmmodel)[8,1]*calb$co[i]+coef(pmmodel)[9,1]*calb$nox[i]+
+      coef(pmmodel)[10,1]*calb$so2[i]
+  }
+  
+  for (i in 1:120) {
+    pmcal[i]<- (355.5125 + 355.5125 * calb$tmax -0.6644001 * calb$rh + 0.04429299 * calb$rain -0.7839519 * calb$ws +-
+      0.3243547 * calb$Press + 0.6768686 * calb$o3+ 39.40836 * calb$co + 1.283827 * calb$nox + 4.648964 * calb$so2)
+    
+  }
+```
+  
+  
+  
+  #head(pmcal)
+  #write.table(pmcal,paste(calb.files[j],".txt")) # prediction values
+  write.table(pmcal,paste(calb,".txt")) # prediction values
+  write.table(pmcal,paste("L2015c.txt"))
+  # Replace negative values with zeros
+  pmcal[pmcal<0] <- 0* (pmcal[pmcal<0])
+  #------------------------------------------------------------------#
+  # Install packages
+```{r}
+install.packages("Metrics")
+  library(Metrics)
+```
+  
+  
+  #Compute Root Mean Square Error
+```{r}
+rmse(calb$pm10[1:120], pmcal[1:120])
+```
+  
+  
+  #Compute  Mean Absolute Error
+```{r}
+mae(calb$pm10[1:120], pmcal[1:120])
+```
+  
+  # IOA 
+```{r}
+install.packages("hydroGOF")
+  library(hydroGOF)
+  d(calb$pm10, pmcal)
+  plot(calb$pm10)
+```
+  
+  # F-test 
+```{r}
+ f_test <- var.test(calb$pm10,pmcal, conf.level = 0.95)
+  f_test
+```
+ 
+  # t-test 
+```{r}
+t_test <- t.test(calb$pm10,pmcal,conf.level = 0.95)
+  t_test
+```
+  
+  
+  

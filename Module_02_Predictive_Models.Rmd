@@ -1,0 +1,33 @@
+---
+title: "Regression Model: Construction,Validation and Verification"
+author: "Ammar Mokhtar Gomah Gaber"
+date: "January 2019"
+output:
+  html_document:
+    df_print: paged
+---
+
+#Introduction to Predictive Models using Various Methods
+The following examples we will use Big Mart Sales data set:
+1. Graphical Representation of Variables
+ggplot2 package will be used to create the graphs. The graphs will allsow us to uns=derstand the distribution and frequency of variables in the data set
+```{r}
+train <- read.csv("F:/R_2019/R_Course_Part_II/Modules/Data/Big_Mart_Sales/Train.csv")
+test <- read.csv("F:/R_2019/R_Course_Part_II/Modules/Data/Big_Mart_Sales/test.csv", header = TRUE)
+```
+
+
+```{r}
+library(ggolpt2)
+# Plot
+ggolpt(train, aes(x=Item_Visibility, y=Item_Outlet_Sales))+ geom_point(size=2.5,
+                                                                       color="navy")+ xlab("Item Visibility")+ ylab("Item Outlet Sales")+ ggtitle("Item Visibility vs Item Outlet Sales")
+```
+
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.

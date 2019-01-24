@@ -1,0 +1,124 @@
+---
+title: "An Introduction to Ensemble Predictives Models"
+author: "Ammar Mokhtar Gomaha Gaber"
+date: "January 2019"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Ensemble Predictive Models
+A model is usually a predictive model or a model of the structure if the data that we want ot construct or discover from the data set, such as a decsion tree, a neural network, a support vector maachine, etc.
+The process of generating models from data is called $learning$ or training, which is accomplished by learning algorithm. There are differnt learning settings, among which the most common ones are $supervised learning$ and $unsupervised learning$. 
+# Example
+Install devtools library and medley from GitHub
+```{r}
+library(devtools)
+install_github(c("medley","mewo2"))
+library(medley)
+```
+
+
+
+```{r}
+
+# Generate some data
+y <- rnorm(1000)       # predectand
+x1 <- (y > 0) ; x2 <- y * rnorm(1000)
+x3 <- rnorm(1000, mean=y, sd=1) ; x4 <- (y > 0)& (y < 3)
+x5 <- rbind(1000, size=4, prob=exp(y)/(1+exp(y)))
+x6 <- (y < -2)| (y > 2)
+# make data frame
+data <- data.frame(y=y,x1=x1,x2=x2,x3=x3,x4=x4,x5=x5,x6=x6)
+# prepare training and test data sets
+train <- sample(1:1000, size = 500)
+trainData <- data[train,]
+testData <- data[-train]
+```
+# Basic Model
+Generate linear modelwith lm()function and test ti with the new data det (testData) using the lowest value of the RMSE. The samllest the value the better.
+
+```{r}
+library(tree)
+lm1 <- lm(y ~ ., data=trainData)
+rmse(predict(lm1, data=testData), testData$y)
+```
+
+# Tree MOdel
+Generate another model using tree package and check its accuracy using the same statistical perfromance indicator (RMSE).
+
+```{r}
+tree1 <- tree(y ~ ., data=trainData)
+rmse(predict(tree1,data=testData), testData$y)
+```
+# Third model
+Generate a third model using tree.
+```{r}
+tree2 <- tree(y ~ ., data=trainData[sample(1:dim(trainData)[1]),])
+```
+
+# Comibning the Models
+Combine the the lm1 and tree1 models
+```{r}
+combine1 <- predict(lm1, data=testData)/2 + predict(tree1, data=testData)/2
+rmse(combine1,testData$y)
+```
+Combine l,1 and tree1 and tree2 models
+```{r}
+combine2 <- (predict(lm1, data=testData)/3 + predict(tree1, data=testData)/3 +
+  predict(tree2, data=testData)/3)
+rmse(combine2, testData$y)
+```
+The error of prediction is getting smaller.
+
+# Medley PAckage
+This package is capable to perfrom an ensamble models
+```{r}
+library(devtools)
+instal.github("medley","mewo2")
+library(medley)
+library(e1071)                     # use SVM
+library(rndomForest)
+# crreate predictors from the training data set.
+x <- trainData[,-1]
+# crreate predctand from the training data set.
+y <- trainData$y
+# crreate predictors from the training data set.
+newx <- testData[,-1]
+```
+
+This technique is most used in Kaggle competitions (http://www.kaggle.com/users/10748/martin-o-leary)
+
+# Blending Models (part 1)
+Now we can blend all the models using the medley apckage:
+```{r}
+m <- create.medley(x,y,errfunc=rmse);
+for (g in 1:10) {
+  m <- add.medley(m, svm, list(sigma=1e-3 *g));
+}
+```
+
+This function creats 10 models using the SUpport Vector Machine (SVM)with 10 different values of gamma. The caculating time and error is also calcualted for each model.
+# Blending Models (part 2)
+medley() function can also be used to generate ensemble models using randomForest():
+```{r}
+for (mt in 1:2) {
+  m <- add.medley(m, randomForest, list(mtry=mt));
+}
+```
+
+Two models will be generated with differnt mt.Calculated time and error values will be produced also.
+The function can identify the good mode
+
+```{r}
+m <- prune.medley(m, 0.8);
+rmse(predict(m,newx), testData$y)
+```
+
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
